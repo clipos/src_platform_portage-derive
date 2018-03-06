@@ -17,10 +17,6 @@ import argparse
 import os
 import portage
 
-RESSOURCE_DIRECTORY = "/usr/share/clip-pkgdb/ressources"
-TEMPLATE_DIRECTORY = "/usr/share/clip-pkgdb/templates"
-TEMPLATE_FILE_DEFAULT = "master.html"
-
 def main_update(args):
     pkgs = PackageDb(args.database)
     pkgs.load()
@@ -74,29 +70,6 @@ def get_ranges(pkgs, now, months):
                     dl += [pkg]
                     break
     return drange
-
-def main_web(args):
-    from jinja2 import Environment, FileSystemLoader
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-    if args.time is None:
-        time = datetime.now(tz.tzutc())
-    else:
-        try:
-            time = dateparser.parse(args.time).replace(tzinfo=tz.tzutc())
-        except:
-            raise Exception("Incorrect time format")
-    env = Environment(loader=FileSystemLoader(TEMPLATE_DIRECTORY))
-    template = env.get_template(TEMPLATE_FILE_DEFAULT)
-    l0 = get_ranges(pkgs, time, args.months)
-    pkgs_str = "var pkgs = {\n" + \
-        ",\n".join(["\"{}\": [[{}]]".format(k, ", ".join(["\"{}\"".format(e.pf) for e in v])) for k,v in iter(sorted(l0.iteritems(), reverse=True))]) + \
-        "};"
-    # The output file could be used outside the SDK
-    ressources = os.path.relpath(RESSOURCE_DIRECTORY, os.path.dirname(args.out))
-    out = template.render(packages=pkgs_str, ressources=ressources)
-    with open(args.out, "wb") as f:
-        f.write(out.encode("utf-8"))
 
 def main_export(args):
     pkgs = PackageDb(args.database)
@@ -168,11 +141,6 @@ if __name__ == '__main__':
     parser_mark.set_defaults(func=main_mark)
     parser_shell = subparser.add_parser("shell", help="launch an IPython shell with the package list context")
     parser_shell.set_defaults(func=main_shell)
-    parser_web = subparser.add_parser("web", help="output a web page with stats")
-    parser_web.add_argument("-t", "--time", help="set the current time", metavar="TIME")
-    parser_web.add_argument("-o", "--out", help="output HTML file", metavar="OUT", required=True)
-    parser_web.add_argument("months", help="months list ranges (should start from 0)", nargs="*", metavar="MONTHS", type=int, default=[0, 1, 6, 12, 24])
-    parser_web.set_defaults(func=main_web)
     parser_export = subparser.add_parser("export", help="export a subset of packages hierarchy with their distfiles")
     parser_export.add_argument("-a", "--all-useflags", help="set all use-flags", action="store_true")
     parser_export.add_argument("-d", "--distfiles-mirror", help="distfiles mirror base URL", required=True)

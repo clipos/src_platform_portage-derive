@@ -13,6 +13,6 @@ all:
 
 install:
 	install -d $(SHARE_DIR)/bin
-	umask 0022; rsync --recursive --links --chmod=u=rwX,go=rX --exclude '*.pyc' --exclude '*.pyo' bin python ressources templates $(PORTAGE) $(SHARE_DIR)
+	umask 0022; rsync --recursive --links --chmod=u=rwX,go=rX --exclude '*.pyc' --exclude '*.pyo' bin python $(PORTAGE) $(SHARE_DIR)
 	install -d $(BIN_DIR)
 	ln -s ../share/clip-pkgdb/bin/clip-pkgdb-wrapper $(BIN_DIR)/clip-pkgdb
