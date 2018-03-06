@@ -7,14 +7,14 @@
 
 from distutils.core import setup
 
-setup(name = 'clip-pkgdb',
+setup(name = 'portage-derive',
       version = '@VERSION@',
       description = 'Library to manage packages metadata for CLIP',
       url = 'http://www.ssi.gouv.fr/',
       author = 'Mickaël Salaün',
       author_email = 'clipos@ssi.gouv.fr',
       packages = [
-          'clip_pkgdb'
+          'portage_derive'
           ]
       )
 

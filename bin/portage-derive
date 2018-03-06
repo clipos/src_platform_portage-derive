@@ -9,7 +9,7 @@
 # Copyright 2015 ANSSI
 # Author: Mickaël Salaün <clipos@ssi.gouv.fr>
 
-from clip_pkgdb import PackageDb, PkgFound, PkgNotFound, get_all_dependencies, get_atom_uris, get_clip_base, export_package, init_portage, CLIP_INT_PKGDB_PATH
+from portage_derive import PackageDb, PkgFound, PkgNotFound, get_all_dependencies, get_atom_uris, get_clip_base, export_package, init_portage, CLIP_INT_PKGDB_PATH
 from datetime import datetime
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
