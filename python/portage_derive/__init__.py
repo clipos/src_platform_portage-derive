@@ -3,13 +3,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright © 2015-2018 ANSSI. All Rights Reserved.
 #
-# Tool to link metadata to packages in a standalone text database optimized for
-# version control systems.
+# Helpers to automate Portage tree management.
 #
-# Copyright 2015 ANSSI
 # Author: Mickaël Salaün <clipos@ssi.gouv.fr>
-#
-# All rights reserved
 
 import logging
 import os
