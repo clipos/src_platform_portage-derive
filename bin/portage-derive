@@ -9,144 +9,65 @@
 # Copyright 2015 ANSSI
 # Author: Mickaël Salaün <clipos@ssi.gouv.fr>
 
-from portage_derive import PackageDb, PkgFound, PkgNotFound, get_all_dependencies, get_atom_uris, get_clip_base, export_package, init_portage, CLIP_INT_PKGDB_PATH
-from datetime import datetime
-from dateutil import tz
-from dateutil.relativedelta import relativedelta
+from portage_derive import get_db, equalize, DRY_RUN
+
 import argparse
-import os
-import portage
+import logging
 
-def main_update(args):
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-    pkgs.scan()
-    pkgs.save()
-
-def main_mark(args):
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-    # Do not use the broken (Python 2) datetime.utcnow()
-    now = datetime.now(tz.tzutc()).replace(microsecond=0)
-    for pkg in pkgs.search_names(args.pkgs):
-        print("Marking {} as checked".format(pkg))
-        pkg.last_checked = now
-    pkgs.save()
+def _print_atom(db, atom):
+    slot, keywords = db.aux_get(atom, ["SLOT", "KEYWORDS"])
+    print("{} slot:{} keywords:{}".format(atom, slot, keywords))
 
 def main_list(args):
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-    if args.pkgs:
-        pkgs = pkgs.search_names(args.pkgs)
-    if args.date:
-        def sort_date(pkg):
-            if pkg.last_checked is None:
-                return datetime.min
-            return pkg.last_checked
-        pkgs = sorted(pkgs, key=sort_date)
-    for pkg in pkgs:
-        date = pkg.last_checked.astimezone(tz.tzlocal()).strftime("%Y-%m-%d %H:%M %Z")
-        print("{}\t{}\t{}".format(date, pkg, pkg.portage))
+    db = get_db(args.portdir)
+    for pkg in args.packages:
+        # "match-all" "bestmatch-visible" "match-visible" "minimum-all" "list-visible"
+        atoms = db.xmatch("list-visible", pkg)
+        if atoms == "":
+            print("Failed to find a package named \"{}\"".format(pkg))
+            return 1
+        if isinstance(atoms, list):
+            for atom in atoms:
+                _print_atom(db, atom)
+        else:
+            _print_atom(db, atoms)
 
 def main_shell(args):
     from IPython.terminal.embed import InteractiveShellEmbed
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-    banner = "Use the \"pkgs\" object to explore the package list."
+    import portage
+    db = get_db(args.portdir)
+    banner = "Use the \"db\" object to explore the portage database."
     ipshell = InteractiveShellEmbed(banner1=banner)
     ipshell()
 
-# months = [0, 1, 6, 12]
-# now = datetime.now()
-def get_ranges(pkgs, now, months):
-    now = now.replace(microsecond=0)
-    drange = {}
-    for p in months:
-        drange[now + relativedelta(months=-p)] = []
-    for pkg in pkgs:
-        if pkg.last_checked is not None:
-            for date, dl in iter(sorted(drange.iteritems())):
-                if pkg.last_checked < date:
-                    dl += [pkg]
-                    break
-    return drange
-
-def main_export(args):
-    pkgs = PackageDb(args.database)
-    pkgs.load()
-
-    if args.portage:
-        init_portage(args.portage)
-    db = portage.db[portage.root]["porttree"].dbapi
-
-    if not args.dry_run:
-        if not os.path.exists(args.output):
-            os.makedirs(args.output)
-
-    not_found = []
-    atoms = []
-    for pkg in args.packages:
-        atom = db.xmatch("bestmatch-visible", pkg)
-        if atom == "":
-            print("Failed to find a package named \"{}\"".format(pkg))
-            return 1
-        atoms += ["={}".format(atom)]
-    for dep in get_all_dependencies(atoms, db, pkgs, args.all_useflags):
-        if isinstance(dep, PkgFound):
-            print("Exporting {}".format(dep))
-            export_package(dep, args.output, args.distfiles_mirror, db, args.dry_run)
-            print
-            continue
-        if isinstance(dep, PkgNotFound):
-            not_found += [dep]
-
-    if not_found != []:
-        print("Could not find atom(s) matching:\n* {}".format("\n* ".join(not_found)))
-
-# TODO:
-# New commands:
-# * mark --lock/unlock: mark a package as WIP or free to work on
-# * comment --add: add a message to a package
-# * --regex
+def main_equalize(args):
+    db = get_db(args.portdir)
+    equalize(db)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Manage a standalone CLIP/Portage text database according to the current CLIP_PATH (e.g. /opt/clip-int).")
-    clip_base = get_clip_base(False)
-    db_required = True
-    db_default = None
-    if clip_base is not None:
-        db_default = "{}/{}".format(clip_base, CLIP_INT_PKGDB_PATH)
-        if os.path.exists(db_default):
-            db_required = False
-        else:
-            db_default = None
-    parser.add_argument("-d", "--database", help="the database file", required=db_required, default=db_default, metavar="FILE")
+    parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
 
-    # Configure portage
-    portage_required = True
-    if os.path.exists("/etc/make.profile"):
-        portage_required = False
-    parser.add_argument("-p", "--portage", help="portage (snapshot) tree", required=portage_required)
-
+    parser.add_argument("-n", "--dry-run", help="do not perform any action on the file system", action="store_true")
+    parser.add_argument("-p", "--portdir", help="Portage tree directory", required=True)
+    parser.add_argument("-q", "--quiet", help="do not output anything except errors", action="store_true")
+    parser.add_argument("-v", "--verbose", help="print debug informations", action="store_true")
     subparser = parser.add_subparsers()
-    parser_update = subparser.add_parser("update", help="update or create a database")
-    parser_update.set_defaults(func=main_update)
-    parser_list = subparser.add_parser("list", help="list packages")
-    parser_list.add_argument("-d", "--date", help="sort by date", action="store_true")
-    parser_list.add_argument("pkgs", help="package name (without the category)", nargs="*", metavar="PACKAGE")
+
+    parser_list = subparser.add_parser("list", help="list visible packages")
+    parser_list.add_argument("packages", help="packages or atom names", nargs="+")
     parser_list.set_defaults(func=main_list)
-    parser_mark = subparser.add_parser("mark", help="mark packages (e.g. last checked date)")
-    parser_mark.add_argument("-c", "--checked", help="stamp as checked", required=True, action="store_true")
-    parser_mark.add_argument("pkgs", help="package name (without the category)", nargs="+", metavar="PACKAGE")
-    parser_mark.set_defaults(func=main_mark)
-    parser_shell = subparser.add_parser("shell", help="launch an IPython shell with the package list context")
+
+    parser_shell = subparser.add_parser("shell", help="launch an IPython shell to hack with the Portage tree database")
     parser_shell.set_defaults(func=main_shell)
-    parser_export = subparser.add_parser("export", help="export a subset of packages hierarchy with their distfiles")
-    parser_export.add_argument("-a", "--all-useflags", help="set all use-flags", action="store_true")
-    parser_export.add_argument("-d", "--distfiles-mirror", help="distfiles mirror base URL", required=True)
-    parser_export.add_argument("-o", "--output", help="output directory to fill with the packages and distfiles", required=True)
-    parser_export.add_argument("-n", "--dry-run", help="Do not download distfiles nor copy files", action="store_true")
-    parser_export.add_argument("packages", help="packages/atoms names", nargs="+")
-    parser_export.set_defaults(func=main_export)
+
+    parser_equalize = subparser.add_parser("equalize", help="equalize a Portage tree (make it Git-friendly to ease merges with stable ebuild names and their symlinks)")
+    parser_equalize.set_defaults(func=main_equalize)
+
     args = parser.parse_args()
+    if not args.quiet:
+        if args.verbose:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
+    DRY_RUN = args.dry_run
     args.func(args)
