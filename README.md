@@ -93,3 +93,50 @@ git merge autoclean
 
 # Manually deal with the remaining merge conflicts, if any
 ```
+
+## Equalization example
+
+Here is an example of all the ebuilds for one package with multiple slots from the Gentoo's Portage tree:
+```
+sys-devel/automake/
+├── Manifest
+├── automake-1.4_p6-r2.ebuild
+├── automake-1.5-r2.ebuild
+├── automake-1.6.3-r2.ebuild
+├── automake-1.7.9-r3.ebuild
+├── automake-1.8.5-r5.ebuild
+├── automake-1.9.6-r4.ebuild
+├── automake-1.9.6-r5.ebuild
+├── automake-1.10.3-r2.ebuild
+├── automake-1.10.3-r3.ebuild
+├── automake-1.11.6-r2.ebuild
+├── automake-1.11.6-r3.ebuild
+├── automake-1.12.6-r1.ebuild
+├── automake-1.12.6-r2.ebuild
+├── automake-1.12.6.ebuild
+├── automake-1.13.4-r1.ebuild
+├── automake-1.13.4-r2.ebuild
+├── automake-1.14.1-r1.ebuild
+├── automake-1.14.1-r2.ebuild
+├── automake-1.15.1-r1.ebuild
+├── automake-1.15.1-r2.ebuild
+├── automake-1.16-r1.ebuild
+├── automake-9999.ebuild
+├── files
+└── metadata.xml
+```
+
+After equalizing for the profile `hardened/linux/amd64` we get:
+```
+sys-devel/automake/
+├── Manifest
+├── automake-1.9.6-r5.ebuild -> .automake.ebuild.6
+├── automake-1.10.3-r3.ebuild -> .automake.ebuild.5
+├── automake-1.11.6-r3.ebuild -> .automake.ebuild.4
+├── automake-1.12.6-r2.ebuild -> .automake.ebuild.3
+├── automake-1.13.4-r2.ebuild -> .automake.ebuild.2
+├── automake-1.14.1-r2.ebuild -> .automake.ebuild.1
+├── automake-1.15.1-r2.ebuild -> .automake.ebuild.0
+├── files
+└── metadata.xml
+```
