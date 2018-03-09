@@ -186,6 +186,8 @@ def equalize(db):
             do_symlinks(db, slots, atom, os.path.dirname(db.findname2(cpv)[0]))
             continue
         # remove files which are not usable with the current profile
-        cpv = db.xmatch("match-all", atom)[0]
-        atom_dir = os.path.dirname(db.findname2(cpv)[0])
+        cpvs = db.xmatch("match-all", atom)
+        if len(cpvs) == 0:
+            raise Exception("Missing atom in the cache, you should run `egencache --update` for this Portage tree")
+        atom_dir = os.path.dirname(db.findname2(cpvs[0])[0])
         fs_remove_tree(atom_dir)
