@@ -4,7 +4,8 @@ This tool is designed to be used in a Gentoo-based SDK.
 
 To get help, run `portage-derive --help`:
 ```
-usage: portage-derive [-h] [-n] -p PORTDIR [-q] [-v] {list,shell,equalize} ...
+usage: portage-derive [-h] -d PORTDIR [-n] -p PROFILE [-q] [-v]
+                      {list,shell,equalize} ...
 
 Tool to automate Portage tree management.
 
@@ -18,9 +19,11 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -n, --dry-run         do not perform any action on the file system
-  -p PORTDIR, --portdir PORTDIR
+  -d PORTDIR, --portdir PORTDIR
                         Portage tree directory
+  -n, --dry-run         do not perform any action on the file system
+  -p PROFILE, --profile PROFILE
+                        Portage profile
   -q, --quiet           do not output anything except errors
   -v, --verbose         print debug informations
 ```
@@ -80,7 +83,7 @@ git checkout autoclean
 git merge --no-commit --strategy=ours upstream
 git read-tree -u -m upstream
 egencache --update "--jobs=$(($(nproc) + 1))"
-portage-derive -p . equalize
+portage-derive -d . -p profiles/hardened/linux/amd64 equalize
 git add -A
 git commit "--message=Merge branch 'upstream' into autoclean"
 

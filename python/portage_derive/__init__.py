@@ -12,7 +12,6 @@ import os
 import portage
 import shutil
 
-PORTAGE_PROFILES = ("hardened/linux/x86", "hardened/x86/2.6", "default/linux/x86", "default-linux/x86")
 PORTAGE_ARCH = "amd64"
 
 DRY_RUN = False
@@ -63,25 +62,18 @@ def get_all_dependencies(depends, db=None, pkgs=None, all_useflags=False, exclud
         for sub in get_all_dependencies(get_atom_dependencies(atom, db, all_useflags), db, pkgs, all_useflags, exclude):
             yield sub
 
-def get_db(portdir):
-    init_portage(portdir)
+def get_db(portdir, profile):
+    init_portage(portdir, profile)
     return portage.db[portage.root]["porttree"].dbapi
 
 # To call before any portage use, if needed
-def init_portage(portage_path, profile=None):
+def init_portage(portage_path, profile_path):
     portage_path = os.path.abspath(portage_path)
-    if profile is None:
-        for p in PORTAGE_PROFILES:
-            profile_path = os.path.join(portage_path, "profiles", p)
-            if os.path.exists(profile_path):
-                profile = p
-                break
-        if profile is None:
-            raise Exception("Could not find a profile in {}".format(portage_path))
-    else:
-        profile_path = os.path.join(portage_path, "profiles", profile)
-        if not os.path.exists(profile_path):
-            raise Exception("Profile directory does not exist: {}".format(profile_path))
+    if not os.path.exists(os.path.join(portage_path, "metadata")):
+        raise Exception("Portage tree is not valid: {}".format(portage_path))
+    profile_path = os.path.abspath(profile_path)
+    if not os.path.exists(os.path.join(profile_path, "eapi")):
+        raise Exception("Profile is not valid: {}".format(profile_path))
     os.environ["PORTDIR"] = portage_path
     portage.const.PROFILE_PATH = profile_path
     # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
