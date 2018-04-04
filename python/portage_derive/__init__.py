@@ -75,8 +75,10 @@ def init_portage(portage_path, profile_path):
     if not os.path.exists(os.path.join(portage_path, "metadata")):
         raise Exception("Portage tree is not valid: {}".format(portage_path))
     profile_path = os.path.abspath(profile_path)
-    if not os.path.exists(os.path.join(profile_path, "eapi")):
-        raise Exception("Profile is not valid: {}".format(profile_path))
+    # TODO: find a better way to check that profile_path is effectively a
+    # profile path ("eapi" file is not mandatory)
+    #if not os.path.exists(os.path.join(profile_path, "eapi")):
+    #    raise Exception("Profile is not valid: {}".format(profile_path))
     os.environ["PORTDIR"] = portage_path
     portage.const.PROFILE_PATH = profile_path
     # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
