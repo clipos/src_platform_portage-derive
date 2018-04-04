@@ -29,6 +29,9 @@ class PkgFound(str):
 class PkgNotFound(str):
     pass
 
+class OutsideOfPortageTreeException(Exception):
+    pass
+
 def get_all_dependencies(depends, db=None, pkgs=None, all_useflags=False, exclude=set()):
     if db is None:
         db = portage.db[portage.root]["porttree"].dbapi
@@ -90,7 +93,7 @@ def assert_beneath_portdir(src):
     root = "{}/".format(portdir)
     if len(portdir) > 1 and os.path.commonprefix([root, src]) == root:
         return
-    raise Exception("Attempt to modify a file outside the Portage tree: {}", src)
+    raise OutsideOfPortageTreeException("Attempt to modify a file outside the Portage tree: {}", src)
 
 def fs_move(common_dir, src, dst):
     src = os.path.join(common_dir, src)
@@ -137,7 +140,11 @@ def do_symlinks(db, slots, atom, atom_dir):
             head, tail = os.path.splitext(name)
             # remove invisible ebuilds
             if tail == ".ebuild" and head not in visibles:
-                fs_remove(os.path.join(atom_dir, name))
+                try:
+                    fs_remove(os.path.join(atom_dir, name))
+                except OutsideOfPortageTreeException as exc:
+                    logging.debug("skipping file for deletion: %s/%s", atom_dir, name)
+                    continue
 
     # It's more common to remove an old package version than the more
     # up-to-date (i.e. we don't downgrade packages but can keep and old version
@@ -157,8 +164,16 @@ def do_symlinks(db, slots, atom, atom_dir):
         # (cf. dbapi/porttree.py:cp_list "Invalid ebuild name" and
         # versions.py:catpkgsplit)
         dst = ".{}.ebuild.{}".format(pvr[0], i)
-        fs_move(atom_dir, src, dst)
-        fs_symlink(atom_dir, src, dst)
+        try:
+            fs_move(atom_dir, src, dst)
+        except OutsideOfPortageTreeException as exc:
+            logging.debug("skipping atom for move: %s/(%s -> %s)", atom_dir, src, dst)
+            continue
+        try:
+            fs_symlink(atom_dir, src, dst)
+        except OutsideOfPortageTreeException as exc:
+            logging.debug("skipping atom for symlink: %s/(%s -> %s)", atom_dir, src, dst)
+            continue
 
 # @db: get_db(PORTDIR)
 def equalize(db):
@@ -182,4 +197,8 @@ def equalize(db):
         if len(cpvs) == 0:
             raise Exception("Missing atom in the cache, you should run `egencache --update` for this Portage tree")
         atom_dir = os.path.dirname(db.findname2(cpvs[0])[0])
-        fs_remove_tree(atom_dir)
+        try:
+            fs_remove_tree(atom_dir)
+        except OutsideOfPortageTreeException as exc:
+            logging.debug("skipping atom dir for deletion: %s", atom_dir)
+            continue
