@@ -9,8 +9,9 @@
 
 import logging
 import os
-import portage
 import shutil
+
+import portage
 
 PORTAGE_ARCH = "amd64"
 

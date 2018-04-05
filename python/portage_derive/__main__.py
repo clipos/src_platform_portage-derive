@@ -7,10 +7,10 @@
 #
 # Author: Mickaël Salaün <clipos@ssi.gouv.fr>
 
-from portage_derive import get_db, equalize, DRY_RUN
-
 import argparse
 import logging
+
+from . import get_db, equalize, DRY_RUN
 
 def _print_atom(db, atom):
     slot, keywords = db.aux_get(atom, ["SLOT", "KEYWORDS"])
@@ -42,7 +42,7 @@ def main_equalize(args):
     db = get_db(args.portdir, args.profile)
     equalize(db)
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
 
     parser.add_argument("-d", "--portdir", help="Portage tree directory", required=True)
@@ -70,3 +70,6 @@ if __name__ == '__main__':
             logging.basicConfig(level=logging.INFO)
     DRY_RUN = args.dry_run
     args.func(args)
+
+if __name__ == '__main__':
+    main()
