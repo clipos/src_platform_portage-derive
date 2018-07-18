@@ -1,0 +1,79 @@
+<html>
+<head>
+	<meta charset="utf-8" />
+	<script type="text/javascript" src="{{ ressources }}/d3.js" charset="utf-8"></script>
+	<script type="text/javascript" src="{{ ressources }}/c3.js"></script>
+	<link rel="stylesheet" type="text/css" href="{{ ressources }}/c3.css">
+	<script>
+
+// Copyright 2015 ANSSI
+// Author: Mickaël Salaün <clipos@ssi.gouv.fr>
+//
+// All rights reserved
+
+{{ packages }}
+
+window.onload = function() {
+	var chart = c3.generate({
+		bindto: '#chart',
+		data: {
+			columns: [
+			],
+			order: null,
+			type: 'bar',
+			onclick: function(d, element) {
+				var elem = document.getElementById("pkgs");
+				elem.innerHTML = "";
+				var node = document.createElement("b");
+				node.appendChild(document.createTextNode("date"));
+				elem.appendChild(node);
+				elem.appendChild(document.createTextNode(": " + d.x));
+				elem.appendChild(document.createElement("br"));
+				var node = document.createElement("b");
+				node.appendChild(document.createTextNode("kind"))
+				elem.appendChild(node);
+				elem.appendChild(document.createTextNode(": " + d.name));
+				elem.appendChild(document.createElement("br"));
+				var node = document.createElement("b");
+				node.appendChild(document.createTextNode("pkgs"))
+				elem.appendChild(node);
+				elem.appendChild(document.createTextNode(": "));
+				var ul = document.createElement("ul");
+				var pl = pkgs[d.id][d.x];
+				for (i = 0; i < pl.length; i++) {
+					var li = document.createElement("li");
+					li.appendChild(document.createTextNode(pl[i]));
+					ul.appendChild(li);
+				}
+				elem.appendChild(ul);
+			},
+		},
+		grid: {
+			y: {
+				lines: [{value:0}]
+			}
+		}
+	});
+
+	var groups = [];
+	for(var key in pkgs) {
+		groups.push(key);
+	}
+	chart.groups([groups]);
+
+	for(var key in pkgs) {
+		var line = [key];
+		for(var i = 0; i < pkgs[key].length; i++) {
+			line[i+1] = pkgs[key][i].length;
+		}
+		chart.load({ columns: [line]});
+	}
+}
+
+	</script>
+</head>
+<body>
+	<div id="chart"></div>
+	<div id="pkgs"></div>
+</body>
+</html>
