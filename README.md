@@ -72,7 +72,7 @@ Then, the following workflow can be used to update the master branch.
 
 ```bash
 # Go to a clean (see git status) Portage tree
-cd /path/to/portage/tree
+cd /mnt/src/portage/gentoo
 
 # Update Gentoo's tree
 git checkout upstream
@@ -82,8 +82,8 @@ git pull
 git checkout autoclean
 git merge --no-commit --strategy=ours upstream
 git read-tree -u -m upstream
-egencache --update "--jobs=$(($(nproc) + 1))"
-portage-derive -d . -p profiles/hardened/linux/amd64 equalize
+egencache --update "--jobs=$(($(nproc) + 1))" --repo=gentoo
+portage-derive -d . -p /mnt/src/portage/clipos/profiles/clipos/amd64 equalize
 git add -A
 git commit "--message=Merge branch 'upstream' into autoclean"
 
