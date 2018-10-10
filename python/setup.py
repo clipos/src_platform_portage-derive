@@ -16,7 +16,7 @@ setup(
     name='portage-derive',
     version='@VERSION@',
     description='Library/tool to automate Portage tree management',
-    url='http://www.ssi.gouv.fr/',
+    url='https://clip-os.org/',
     author='Mickaël Salaün',
     author_email='clipos@ssi.gouv.fr',
     packages=[
