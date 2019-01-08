@@ -47,7 +47,7 @@ This makes it difficult to keep track of our modifications, and may disturb Git'
 The tool `portage-derive equalize` helps overcome this issue.
 
 Equalizing a Portage tree means two things:
-- only keep the best ebuilds (for each slots) which are visible to our Portage profile;
+- only keep the latest ebuild (for each slot) which is visible to the given Portage profile;
 - using a stable naming convention to ease file tracking (and merging).
 
 This stable naming convention consists of identifying the best ebuild for each slot, starting from the latest (higher version), with a numbering independent from the version and the slot.
@@ -88,7 +88,7 @@ git read-tree -u -m upstream
 egencache --update "--jobs=$(($(nproc) + 1))" --repo=gentoo
 portage-derive -d . -p /mnt/src/portage/clipos/profiles/clipos/amd64 equalize
 git add -A
-git commit "--message=Merge branch 'upstream' into autoclean"
+git commit --message="Merge branch 'upstream' into autoclean"
 
 # Merge with our custom changes
 git checkout master
