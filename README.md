@@ -15,7 +15,9 @@ positional arguments:
     shell               launch an IPython shell to hack with the Portage tree
                         database
     equalize            equalize a Portage tree (make it Git-friendly to ease
-                        merges with stable ebuild names and their symlinks)
+                        merges with stable ebuild names and their symlinks);
+                        operate on the whole tree if no package/atom is given;
+                        otherwise operate on given packages/atoms only
 
 optional arguments:
   -h, --help            show this help message and exit

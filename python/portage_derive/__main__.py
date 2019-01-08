@@ -40,7 +40,7 @@ def main_shell(args):
 
 def main_equalize(args):
     db = get_db(args.portdir, args.profile)
-    equalize(db)
+    equalize(db, atoms=args.packages)
 
 def main():
     parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
@@ -59,7 +59,8 @@ def main():
     parser_shell = subparser.add_parser("shell", help="launch an IPython shell to hack with the Portage tree database")
     parser_shell.set_defaults(func=main_shell)
 
-    parser_equalize = subparser.add_parser("equalize", help="equalize a Portage tree (make it Git-friendly to ease merges with stable ebuild names and their symlinks)")
+    parser_equalize = subparser.add_parser("equalize", help="equalize a Portage tree (make it Git-friendly to ease merges with stable ebuild names and their symlinks); operate on the whole tree if no package/atom is given; otherwise operate on given packages/atoms only")
+    parser_equalize.add_argument("packages", help="packages or atoms", nargs="*", default=[])
     parser_equalize.set_defaults(func=main_equalize)
 
     args = parser.parse_args()

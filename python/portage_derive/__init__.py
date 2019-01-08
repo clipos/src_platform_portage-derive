@@ -178,10 +178,20 @@ def do_symlinks(db, slots, atom, atom_dir):
             logging.debug("skipping atom for symlink: %s/(%s -> %s)", atom_dir, src, dst)
             continue
 
-# @db: get_db(PORTDIR)
-def equalize(db):
-    # atoms = db.cp_all(categories=["www-client"], sort=False)
-    atoms = db.cp_all()
+def equalize(db, atoms=None):
+    """Equalize a Gentoo Portage tree. If `atoms` is None (or emtpy list, or
+    whatever evaluates to False), then this function will equalize the entire
+    Portage tree.
+
+    :param db: The Portage tree database as returned by `get_db(PORTDIR)` and
+        where PORTDIR is the path to the said Portage tree
+
+    """
+
+    # Get the entire list of atoms provided by the Portage tree database `db`:
+    if not atoms:
+        atoms = db.cp_all()
+
     atom_nb = len(atoms)
     for i, atom in enumerate(atoms, start=1):
         # find all the slots for this atom
