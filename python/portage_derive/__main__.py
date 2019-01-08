@@ -52,8 +52,8 @@ def main():
     parser.add_argument("-v", "--verbose", help="print debug informations", action="store_true")
     subparser = parser.add_subparsers()
 
-    parser_list = subparser.add_parser("list", help="list visible packages")
-    parser_list.add_argument("packages", help="packages or atom names", nargs="+")
+    parser_list = subparser.add_parser("list", help="list visible ebuilds for a given package/atom (must give at least one package/atom)")
+    parser_list.add_argument("packages", help="packages or atoms", nargs="+")
     parser_list.set_defaults(func=main_list)
 
     parser_shell = subparser.add_parser("shell", help="launch an IPython shell to hack with the Portage tree database")

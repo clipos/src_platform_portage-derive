@@ -11,7 +11,8 @@ Tool to automate Portage tree management.
 
 positional arguments:
   {list,shell,equalize}
-    list                list visible packages
+    list                list visible ebuilds for a given package/atom (must
+                        give at least one package/atom)
     shell               launch an IPython shell to hack with the Portage tree
                         database
     equalize            equalize a Portage tree (make it Git-friendly to ease
