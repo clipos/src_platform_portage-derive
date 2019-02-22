@@ -7,6 +7,10 @@
 #
 # Author: Mickaël Salaün <clipos@ssi.gouv.fr>
 
+# The only place where the version of this Python package is defined (setup.py
+# reparses only this line for setuptools). This versioning follows semver.
+__version__ = "0.1.0"
+
 import logging
 import os
 import shutil
