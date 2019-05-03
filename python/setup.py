@@ -41,9 +41,6 @@ setup(
     packages=[
         'portage_derive',
     ],
-    install_requires=[
-        'portage>=2.3.13',
-    ],
     extra_requires={
         'shell': ['ipython'],
     },
