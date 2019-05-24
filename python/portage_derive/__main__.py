@@ -10,7 +10,7 @@
 import argparse
 import logging
 
-from . import get_db, equalize, DRY_RUN
+from . import get_db, equalize
 
 def _print_atom(db, atom):
     slot, keywords = db.aux_get(atom, ["SLOT", "KEYWORDS"])
@@ -40,7 +40,7 @@ def main_shell(args):
 
 def main_equalize(args):
     db = get_db(args.portdir, args.profile)
-    equalize(db, atoms=args.packages)
+    equalize(db, atoms=args.packages, dry_run=args.dry_run)
 
 def main():
     parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
@@ -69,7 +69,6 @@ def main():
             logging.basicConfig(level=logging.DEBUG)
         else:
             logging.basicConfig(level=logging.INFO)
-    DRY_RUN = args.dry_run
     args.func(args)
 
 if __name__ == '__main__':
