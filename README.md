@@ -26,7 +26,7 @@ optional arguments:
                         Portage tree directory
   -n, --dry-run         do not perform any action on the file system
   -p PROFILE, --profile PROFILE
-                        Portage profile
+                        Portage profile(s)
   -q, --quiet           do not output anything except errors
   -v, --verbose         print debug informations
 ```

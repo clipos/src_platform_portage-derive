@@ -70,24 +70,88 @@ def get_all_dependencies(depends, db=None, pkgs=None, all_useflags=False, exclud
         for sub in get_all_dependencies(get_atom_dependencies(atom, db, all_useflags), db, pkgs, all_useflags, exclude):
             yield sub
 
-def get_db(portdir, profile):
-    init_portage(portdir, profile)
-    return portage.db[portage.root]["porttree"].dbapi
+class MultiDb(object):
+    """wrapper around a set of Portage databases"""
+    def __init__(self, portdir, profiles):
+        self.portdir = os.path.abspath(portdir)
+        if not os.path.exists(os.path.join(self.portdir, "metadata")):
+            raise Exception("Portage tree is not valid: {}".format(self.portdir))
+        # TODO: find a better way to check that profile is effectively a
+        # profile path ("eapi" file is not mandatory)
+        #if not os.path.exists(os.path.join(profile, "eapi")):
+        #    raise Exception("Profile is not valid: {}".format(profile))
+        os.environ["PORTDIR"] = self.portdir
+        # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
+        #os.environ["PORTAGE_CONFIGROOT"] = WORKDIR
+        portage.const.PROFILE_PATH = ""
+        self.configs = [portage.config(config_profile_path=os.path.abspath(p)) for p in profiles]
+        self._db = portage.db[portage.root]["porttree"].dbapi
+        # ignore overlays
+        self._db.porttrees = [ self.portdir ]
 
-# To call before any portage use, if needed
-def init_portage(portage_path, profile_path):
-    portage_path = os.path.abspath(portage_path)
-    if not os.path.exists(os.path.join(portage_path, "metadata")):
-        raise Exception("Portage tree is not valid: {}".format(portage_path))
-    profile_path = os.path.abspath(profile_path)
-    # TODO: find a better way to check that profile_path is effectively a
-    # profile path ("eapi" file is not mandatory)
-    #if not os.path.exists(os.path.join(profile_path, "eapi")):
-    #    raise Exception("Profile is not valid: {}".format(profile_path))
-    os.environ["PORTDIR"] = portage_path
-    portage.const.PROFILE_PATH = profile_path
-    # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
-    #os.environ["PORTAGE_CONFIGROOT"] = WORKDIR
+    def _get_dbs(self):
+        for config in self.configs:
+            self._db.settings = config
+            yield self._db
+
+    # get the atom path which is beneath the selected portdir (there is only
+    # one portdir, no overlay)
+    def get_atom_path_selected(self, mycpv, mytree=None, myrepo=None):
+        for db in self._get_dbs():
+            path = db.findname2(mycpv, mytree, myrepo)[0]
+            if path is not None:
+                # same semantic as assert_beneath_portdir(path)
+                assert os.path.commonprefix([self.portdir, path]) == self.portdir
+                return path
+        return None
+
+    def get_atom_dir_selected(self, mycpv, mytree=None, myrepo=None):
+        path = self.get_atom_path_selected(mycpv, mytree, myrepo)
+        if path is not None:
+            return os.path.dirname(path)
+        return None
+
+    def cp_all(self, categories=None, trees=None):
+        ret = set()
+        for db in self._get_dbs():
+            ret.update(db.cp_all(categories, trees))
+        return ret
+
+    def aux_get_first(self, mycpv, mylist, mytree=None, myrepo=None):
+        for db in self._get_dbs():
+            ret = db.aux_get(mycpv, mylist, mytree, myrepo)
+            if ret:
+                return ret
+        return []
+
+    def match(self, mydep, use_cache=1):
+        ret = set()
+        for db in self._get_dbs():
+            # Matches which are not part of the selected portdir are ignored
+            # thanks to the initial porttrees filtering.
+            ret.update(db.match(mydep, use_cache))
+        return ret
+
+    def match_all(self, mycpv):
+        ret = set()
+        for db in self._get_dbs():
+            # "match-all" "bestmatch-visible" "match-visible" "minimum-all" "list-visible"
+            ret.update(db.xmatch("match-all", mycpv))
+        return ret
+
+    def match_visibles(self, mycpv):
+        ret = set()
+        for db in self._get_dbs():
+            ret.update(db.xmatch("list-visible", mycpv))
+        return ret
+
+    def match_best_visibles(self, mycpv):
+        ret = set()
+        for db in self._get_dbs():
+            m = db.xmatch("bestmatch-visible", mycpv)
+            if len(m) != 0:
+                ret.add(m)
+        return ret
 
 def set_stable(db, is_stable):
     db.settings.unlock()
@@ -95,7 +159,7 @@ def set_stable(db, is_stable):
     db.settings.lock()
 
 def assert_beneath_portdir(src):
-    # $PORTDIR is set by init_portage()
+    # $PORTDIR is set by MultiDb
     portdir = os.environ["PORTDIR"]
     root = "{}/".format(portdir)
     if len(portdir) > 1 and os.path.commonprefix([root, src]) == root:
@@ -132,16 +196,16 @@ def fs_remove_tree(src):
     if not DRY_RUN:
         shutil.rmtree(src)
 
-def do_symlinks(db, slots, atom, atom_dir):
+def do_symlinks(mdb, slots, atom, atom_dir):
     logging.debug("working in {}".format(atom_dir))
     # for each slot, get the best match according to the profile (i.e. newer stable, or newer unstable if the profile whitelist this atom)
     visibles = set()
     for slot in slots:
-        cpv = db.xmatch("bestmatch-visible", "{}:{}".format(atom, slot))
-        slot, keywords = db.aux_get(cpv, ["SLOT", "KEYWORDS"])
-        visibles.add(os.path.basename(cpv))
-        # may use isStable() from portage/package/ebuild/_config/KeywordsManager.py
-        logging.debug("found {} slot:{}".format(cpv, slot))
+        for cpv in mdb.match_best_visibles("{}:{}".format(atom, slot)):
+            slot, keywords = mdb.aux_get_first(cpv, ["SLOT", "KEYWORDS"])
+            visibles.add(os.path.basename(cpv))
+            # may use isStable() from portage/package/ebuild/_config/KeywordsManager.py
+            logging.debug("found {} slot:{}".format(cpv, slot))
     for root, dirs, files in os.walk(atom_dir):
         for name in files:
             head, tail = os.path.splitext(name)
@@ -187,36 +251,34 @@ def equalize(mdb, atoms=None, dry_run=False):
     whatever evaluates to False), then this function will equalize the entire
     Portage tree.
 
-    :param db: The Portage tree database as returned by `get_db(PORTDIR)` and
-        where PORTDIR is the path to the said Portage tree
-
+    :param mdb: a set of Portage tree databases from MultiDb
     """
 
     global DRY_RUN
     DRY_RUN = dry_run
 
-    # Get the entire list of atoms provided by the Portage tree database `db`:
+    # get the entire list of atoms provided by the set of Portage tree
+    # databases `mdb`
     if not atoms:
-        atoms = db.cp_all()
+        atoms = mdb.cp_all()
 
     atom_nb = len(atoms)
     for i, atom in enumerate(atoms, start=1):
         # find all the slots for this atom
         slots = set()
-        for cpv in db.match(atom):
-            slots.add(db.aux_get(cpv, ["SLOT"])[0])
+        for cpv in mdb.match(atom):
+            slots.add(mdb.aux_get_first(cpv, ["SLOT"])[0])
         logging.debug("")
         logging.info("equalizing {}/{} {}".format(i, atom_nb, atom))
         # check if some slots are visible to the current profile
         if len(slots) != 0:
-            # get atom's directory from the last cpv (assume there is only one portdir, no overlay)
-            do_symlinks(db, slots, atom, os.path.dirname(db.findname2(cpv)[0]))
+            do_symlinks(mdb, slots, atom, mdb.get_atom_dir_selected(cpv))
             continue
         # remove files which are not usable with the current profile
-        cpvs = db.xmatch("match-all", atom)
+        cpvs = mdb.match_all(atom)
         if len(cpvs) == 0:
             raise Exception("Missing atom in the cache, you should run `egencache --update` for this Portage tree")
-        atom_dir = os.path.dirname(db.findname2(cpvs[0])[0])
+        atom_dir = mdb.get_atom_dir_selected(cpvs.pop())
         try:
             fs_remove_tree(atom_dir)
         except OutsideOfPortageTreeException as exc:

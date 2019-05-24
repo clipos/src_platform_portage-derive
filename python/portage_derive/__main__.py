@@ -10,44 +10,43 @@
 import argparse
 import logging
 
-from . import get_db, equalize
+from . import MultiDb, equalize
 
-def _print_atom(db, atom):
-    slot, keywords = db.aux_get(atom, ["SLOT", "KEYWORDS"])
+def _print_atom(mdb, atom):
+    slot, keywords = mdb.aux_get_first(atom, ["SLOT", "KEYWORDS"])
     print("{} slot:{} keywords:{}".format(atom, slot, keywords))
 
 def main_list(args):
-    db = get_db(args.portdir, args.profile)
+    mdb = MultiDb(args.portdir, args.profile)
     for pkg in args.packages:
-        # "match-all" "bestmatch-visible" "match-visible" "minimum-all" "list-visible"
-        atoms = db.xmatch("list-visible", pkg)
+        atoms = mdb.match_visibles(pkg)
         if atoms == "":
             print("Failed to find a package named \"{}\"".format(pkg))
             return 1
-        if isinstance(atoms, list):
+        if isinstance(atoms, set):
             for atom in atoms:
-                _print_atom(db, atom)
+                _print_atom(mdb, atom)
         else:
-            _print_atom(db, atoms)
+            _print_atom(mdb, atoms)
 
 def main_shell(args):
     from IPython.terminal.embed import InteractiveShellEmbed
     import portage
-    db = get_db(args.portdir, args.profile)
-    banner = "Use the \"db\" object to explore the portage database."
+    mdb = MultiDb(args.portdir, args.profile)
+    banner = "Use the \"mdb\" object to explore the Portage databases."
     ipshell = InteractiveShellEmbed(banner1=banner)
     ipshell()
 
 def main_equalize(args):
-    db = get_db(args.portdir, args.profile)
-    equalize(db, atoms=args.packages, dry_run=args.dry_run)
+    mdb = MultiDb(args.portdir, args.profile)
+    equalize(mdb, atoms=args.packages, dry_run=args.dry_run)
 
 def main():
     parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
 
     parser.add_argument("-d", "--portdir", help="Portage tree directory", required=True)
     parser.add_argument("-n", "--dry-run", help="do not perform any action on the file system", action="store_true")
-    parser.add_argument("-p", "--profile", help="Portage profile", required=True)
+    parser.add_argument("-p", "--profile", help="Portage profile(s)", action="append", required=True)
     parser.add_argument("-q", "--quiet", help="do not output anything except errors", action="store_true")
     parser.add_argument("-v", "--verbose", help="print debug informations", action="store_true")
     subparser = parser.add_subparsers()
