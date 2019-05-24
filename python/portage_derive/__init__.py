@@ -150,7 +150,7 @@ def do_symlinks(db, slots, atom, atom_dir):
                 try:
                     fs_remove(os.path.join(atom_dir, name))
                 except OutsideOfPortageTreeException as exc:
-                    logging.debug("skipping file for deletion: %s/%s", atom_dir, name)
+                    logging.warning("skipping file for deletion (duplicate atoms?): %s/%s", atom_dir, name)
                     continue
 
     # It's more common to remove an old package version than the more
@@ -174,12 +174,12 @@ def do_symlinks(db, slots, atom, atom_dir):
         try:
             fs_move(atom_dir, src, dst)
         except OutsideOfPortageTreeException as exc:
-            logging.debug("skipping atom for move: %s/(%s -> %s)", atom_dir, src, dst)
+            logging.warning("skipping atom for move (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
             continue
         try:
             fs_symlink(atom_dir, src, dst)
         except OutsideOfPortageTreeException as exc:
-            logging.debug("skipping atom for symlink: %s/(%s -> %s)", atom_dir, src, dst)
+            logging.warning("skipping atom for symlink (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
             continue
 
 def equalize(mdb, atoms=None, dry_run=False):
