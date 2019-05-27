@@ -17,58 +17,10 @@ import shutil
 
 import portage
 
-PORTAGE_ARCH = "amd64"
-
 DRY_RUN = False
-
-def get_atom_dependencies(atom, db=None, all_useflags=False):
-    if db is None:
-        db = portage.db[portage.root]["porttree"].dbapi
-    if atom != "":
-        return portage.dep.use_reduce(portage.dep.paren_enclose(db.aux_get(atom, ["DEPEND", "RDEPEND"])), matchall=all_useflags)
-    return []
-
-class PkgFound(str):
-    pass
-
-class PkgNotFound(str):
-    pass
 
 class OutsideOfPortageTreeException(Exception):
     pass
-
-def get_all_dependencies(depends, db=None, pkgs=None, all_useflags=False, exclude=set()):
-    if db is None:
-        db = portage.db[portage.root]["porttree"].dbapi
-    if pkgs is None:
-        pkgs = PackageDb(None)
-    for dep in depends:
-        if isinstance(dep, list):
-            for sub in get_all_dependencies(dep, db, pkgs, all_useflags, exclude):
-                yield sub
-            continue
-        if dep.startswith("!"):
-            continue
-        if dep == u"||":
-            continue
-        pkgs_deps = pkgs.match(dep)
-        if pkgs_deps:
-            # Assume we have all the dependencies (i.e. use flags) for our packages
-            exclude.update([PkgFound(p) for p in pkgs_deps])
-            continue
-        atom = db.xmatch("bestmatch-visible", dep)
-        if atom == "":
-            atom = PkgNotFound(dep)
-        else:
-            atom = PkgFound(atom)
-        if atom in exclude:
-            continue
-        exclude.add(atom)
-        yield atom
-        if isinstance(atom, PkgNotFound):
-            continue
-        for sub in get_all_dependencies(get_atom_dependencies(atom, db, all_useflags), db, pkgs, all_useflags, exclude):
-            yield sub
 
 def _get_plural(name, elements):
     if isinstance(elements, set) or isinstance(elements, list):
@@ -180,11 +132,6 @@ class MultiDb(object):
             if len(m) != 0:
                 ret.add(m)
         return ret
-
-def set_stable(db, is_stable):
-    db.settings.unlock()
-    db.settings["ACCEPT_KEYWORDS"] = "{}{}".format({True:"", False:"~"}[is_stable], PORTAGE_ARCH);
-    db.settings.lock()
 
 def assert_beneath_portdir(src):
     # $PORTDIR is set by MultiDb
