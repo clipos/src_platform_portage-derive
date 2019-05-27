@@ -80,7 +80,7 @@ class MultiDb(object):
         for db in self._get_dbs():
             path = db.findname2(mycpv, mytree, myrepo)[0]
             if path is not None:
-                # same semantic as assert_beneath_portdir(path)
+                # same semantic as _assert_beneath_portdir(path)
                 assert os.path.commonprefix([self.portdir, path]) == self.portdir
                 return path
         return None
@@ -133,7 +133,7 @@ class MultiDb(object):
                 ret.add(m)
         return ret
 
-def assert_beneath_portdir(src):
+def _assert_beneath_portdir(src):
     # $PORTDIR is set by MultiDb
     portdir = os.environ["PORTDIR"]
     root = "{}/".format(portdir)
@@ -141,32 +141,32 @@ def assert_beneath_portdir(src):
         return
     raise OutsideOfPortageTreeException("Attempt to modify a file outside the Portage tree: {}", src)
 
-def fs_move(common_dir, src, dst):
+def _fs_move(common_dir, src, dst):
     src = os.path.join(common_dir, src)
     dst = os.path.join(common_dir, dst)
-    assert_beneath_portdir(src)
-    assert_beneath_portdir(dst)
+    _assert_beneath_portdir(src)
+    _assert_beneath_portdir(dst)
     logging.debug("moving {} -> {}".format(src, dst))
     if not DRY_RUN:
         shutil.move(src, dst)
 
-def fs_symlink(common_dir, src, dst):
+def _fs_symlink(common_dir, src, dst):
     src = os.path.join(common_dir, src)
-    assert_beneath_portdir(src)
+    _assert_beneath_portdir(src)
     if dst != os.path.basename(dst):
         raise Exception("Attempt to symlink to an absolute path: {}", dst)
     logging.debug("linking {} -> {}".format(src, dst))
     if not DRY_RUN:
         os.symlink(dst, src)
 
-def fs_remove(src):
-    assert_beneath_portdir(src)
+def _fs_remove(src):
+    _assert_beneath_portdir(src)
     logging.debug("removing file {}".format(src))
     if not DRY_RUN:
         os.unlink(src)
 
-def fs_remove_tree(src):
-    assert_beneath_portdir(src)
+def _fs_remove_tree(src):
+    _assert_beneath_portdir(src)
     logging.debug("removing tree {}".format(src))
     if not DRY_RUN:
         shutil.rmtree(src)
@@ -182,7 +182,7 @@ class EqualizeSummary(object):
         yield _get_plural("removed package", self.removed_packages)
         yield _get_plural("symlinked ebuild", self.symlinked_ebuilds)
 
-def do_symlinks(mdb, slots, atom, atom_dir, summary):
+def _do_symlinks(mdb, slots, atom, atom_dir, summary):
     logging.debug("working in {}".format(atom_dir))
     # for each slot, get the best match according to the profile (i.e. newer stable, or newer unstable if the profile whitelist this atom)
     visibles = set()
@@ -198,7 +198,7 @@ def do_symlinks(mdb, slots, atom, atom_dir, summary):
             # remove invisible ebuilds
             if tail == ".ebuild" and head not in visibles:
                 try:
-                    fs_remove(os.path.join(atom_dir, name))
+                    _fs_remove(os.path.join(atom_dir, name))
                     summary.removed_ebuilds.add(head)
                 except OutsideOfPortageTreeException as exc:
                     logging.warning("skipping file for deletion (duplicate atoms?): %s/%s", atom_dir, name)
@@ -223,12 +223,12 @@ def do_symlinks(mdb, slots, atom, atom_dir, summary):
         # versions.py:catpkgsplit)
         dst = ".{}.ebuild.{}".format(pvr[0], i)
         try:
-            fs_move(atom_dir, src, dst)
+            _fs_move(atom_dir, src, dst)
         except OutsideOfPortageTreeException as exc:
             logging.warning("skipping atom for move (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
             continue
         try:
-            fs_symlink(atom_dir, src, dst)
+            _fs_symlink(atom_dir, src, dst)
             summary.symlinked_ebuilds += 1
         except OutsideOfPortageTreeException as exc:
             logging.warning("skipping atom for symlink (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
@@ -261,7 +261,7 @@ def equalize(mdb, atoms=None, dry_run=False):
         logging.info("equalizing {}/{} {}".format(i, atom_nb, atom))
         # check if some slots are visible to the current profile
         if len(slots) != 0:
-            do_symlinks(mdb, slots, atom, mdb.get_atom_dir_selected(cpv), summary)
+            _do_symlinks(mdb, slots, atom, mdb.get_atom_dir_selected(cpv), summary)
             continue
         # remove files which are not usable with the current profile
         cpvs = mdb.match_all(atom)
@@ -270,7 +270,7 @@ def equalize(mdb, atoms=None, dry_run=False):
         cpv = cpvs.pop()
         atom_dir = mdb.get_atom_dir_selected(cpv)
         try:
-            fs_remove_tree(atom_dir)
+            _fs_remove_tree(atom_dir)
             summary.removed_packages.add("/".join(portage.pkgsplit(cpv)[0:2]))
         except OutsideOfPortageTreeException as exc:
             logging.debug("skipping atom dir for deletion: %s", atom_dir)
