@@ -84,10 +84,31 @@ class MultiDb(object):
         # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
         #os.environ["PORTAGE_CONFIGROOT"] = WORKDIR
         portage.const.PROFILE_PATH = ""
-        self.configs = [portage.config(config_profile_path=os.path.abspath(p)) for p in profiles]
+        self._init_configs(profiles)
         self._db = portage.db[portage.root]["porttree"].dbapi
         # ignore overlays
         self._db.porttrees = [ self.portdir ]
+        self._init_log()
+
+    # make unique and deterministic (sorted) a set of Portage configurations
+    def _init_configs(self, profiles):
+        paths = set()
+        # unique paths
+        for profile in profiles:
+            paths.add(os.path.realpath(profile))
+        self.configs = set()
+        # unique configs
+        for path in paths:
+            self.configs.add(portage.config(config_profile_path=path))
+
+    def get_profile_paths(self):
+        for c in self.configs:
+            yield c.profile_path
+
+    def _init_log(self):
+        paths = [x for x in self.get_profile_paths()]
+        nb = len(paths)
+        logging.info("using {} profile{}: {}".format(nb, ("", "s")[nb > 1], paths))
 
     def _get_dbs(self):
         for config in self.configs:
