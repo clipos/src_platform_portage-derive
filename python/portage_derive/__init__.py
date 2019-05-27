@@ -44,13 +44,15 @@ class MultiDb(object):
         # profile path ("eapi" file is not mandatory)
         #if not os.path.exists(os.path.join(profile, "eapi")):
         #    raise Exception("Profile is not valid: {}".format(profile))
-        os.environ["PORTDIR"] = self.portdir
         # PORTAGE_CONFIGROOT: Virtual root to find configuration (e.g. etc/make.conf)
         #os.environ["PORTAGE_CONFIGROOT"] = WORKDIR
         portage.const.PROFILE_PATH = ""
         self._init_configs(profiles)
+        # Initialize the Portage database, including the eclass cache, with the
+        # real main portdir and all overlays.
         self._db = portage.db[portage.root]["porttree"].dbapi
-        # ignore overlays
+        # Ignore (other) overlays (and the real main portdir) but still keep
+        # the ability to inherit from them (e.g. eclass resolution).
         self._db.porttrees = [ self.portdir ]
         logging.info("using {}".format(_get_plural("profile", [x for x in self.get_profile_paths()])))
 
@@ -69,6 +71,12 @@ class MultiDb(object):
         for c in self.configs:
             yield c.profile_path
 
+    def assert_beneath_portdir(self, src):
+        root = "{}/".format(self.portdir)
+        if os.path.commonprefix([root, src]) == root:
+            return
+        raise OutsideOfPortageTreeException("Attempt to modify a file outside the Portage tree: {}", src)
+
     def _get_dbs(self):
         for config in self.configs:
             self._db.settings = config
@@ -80,8 +88,7 @@ class MultiDb(object):
         for db in self._get_dbs():
             path = db.findname2(mycpv, mytree, myrepo)[0]
             if path is not None:
-                # same semantic as _assert_beneath_portdir(path)
-                assert os.path.commonprefix([self.portdir, path]) == self.portdir
+                self.assert_beneath_portdir(path)
                 return path
         return None
 
@@ -133,40 +140,32 @@ class MultiDb(object):
                 ret.add(m)
         return ret
 
-def _assert_beneath_portdir(src):
-    # $PORTDIR is set by MultiDb
-    portdir = os.environ["PORTDIR"]
-    root = "{}/".format(portdir)
-    if len(portdir) > 1 and os.path.commonprefix([root, src]) == root:
-        return
-    raise OutsideOfPortageTreeException("Attempt to modify a file outside the Portage tree: {}", src)
-
-def _fs_move(common_dir, src, dst):
+def _fs_move(common_dir, src, dst, assert_path):
     src = os.path.join(common_dir, src)
     dst = os.path.join(common_dir, dst)
-    _assert_beneath_portdir(src)
-    _assert_beneath_portdir(dst)
+    assert_path(src)
+    assert_path(dst)
     logging.debug("moving {} -> {}".format(src, dst))
     if not DRY_RUN:
         shutil.move(src, dst)
 
-def _fs_symlink(common_dir, src, dst):
+def _fs_symlink(common_dir, src, dst, assert_path):
     src = os.path.join(common_dir, src)
-    _assert_beneath_portdir(src)
+    assert_path(src)
     if dst != os.path.basename(dst):
         raise Exception("Attempt to symlink to an absolute path: {}", dst)
     logging.debug("linking {} -> {}".format(src, dst))
     if not DRY_RUN:
         os.symlink(dst, src)
 
-def _fs_remove(src):
-    _assert_beneath_portdir(src)
+def _fs_remove(src, assert_path):
+    assert_path(src)
     logging.debug("removing file {}".format(src))
     if not DRY_RUN:
         os.unlink(src)
 
-def _fs_remove_tree(src):
-    _assert_beneath_portdir(src)
+def _fs_remove_tree(src, assert_path):
+    assert_path(src)
     logging.debug("removing tree {}".format(src))
     if not DRY_RUN:
         shutil.rmtree(src)
@@ -198,7 +197,7 @@ def _do_symlinks(mdb, slots, atom, atom_dir, summary):
             # remove invisible ebuilds
             if tail == ".ebuild" and head not in visibles:
                 try:
-                    _fs_remove(os.path.join(atom_dir, name))
+                    _fs_remove(os.path.join(atom_dir, name), mdb.assert_beneath_portdir)
                     summary.removed_ebuilds.add(head)
                 except OutsideOfPortageTreeException as exc:
                     logging.warning("skipping file for deletion (duplicate atoms?): %s/%s", atom_dir, name)
@@ -223,12 +222,12 @@ def _do_symlinks(mdb, slots, atom, atom_dir, summary):
         # versions.py:catpkgsplit)
         dst = ".{}.ebuild.{}".format(pvr[0], i)
         try:
-            _fs_move(atom_dir, src, dst)
+            _fs_move(atom_dir, src, dst, mdb.assert_beneath_portdir)
         except OutsideOfPortageTreeException as exc:
             logging.warning("skipping atom for move (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
             continue
         try:
-            _fs_symlink(atom_dir, src, dst)
+            _fs_symlink(atom_dir, src, dst, mdb.assert_beneath_portdir)
             summary.symlinked_ebuilds += 1
         except OutsideOfPortageTreeException as exc:
             logging.warning("skipping atom for symlink (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
@@ -270,7 +269,7 @@ def equalize(mdb, atoms=None, dry_run=False):
         cpv = cpvs.pop()
         atom_dir = mdb.get_atom_dir_selected(cpv)
         try:
-            _fs_remove_tree(atom_dir)
+            _fs_remove_tree(atom_dir, mdb.assert_beneath_portdir)
             summary.removed_packages.add("/".join(portage.pkgsplit(cpv)[0:2]))
         except OutsideOfPortageTreeException as exc:
             logging.debug("skipping atom dir for deletion: %s", atom_dir)
