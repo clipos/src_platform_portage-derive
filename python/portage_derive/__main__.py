@@ -39,7 +39,11 @@ def main_shell(args):
 
 def main_equalize(args):
     mdb = MultiDb(args.portdir, args.profile)
-    equalize(mdb, atoms=args.packages, dry_run=args.dry_run)
+    summary = equalize(mdb, atoms=args.packages, dry_run=args.dry_run)
+    if args.summary:
+        print("Summary:")
+        for s in summary.get_lines():
+            print("* " + s)
 
 def main():
     parser = argparse.ArgumentParser(description="Tool to automate Portage tree management.")
@@ -47,7 +51,7 @@ def main():
     parser.add_argument("-d", "--portdir", help="Portage tree directory", required=True)
     parser.add_argument("-n", "--dry-run", help="do not perform any action on the file system", action="store_true")
     parser.add_argument("-p", "--profile", help="Portage profile(s)", action="append", required=True)
-    parser.add_argument("-q", "--quiet", help="do not output anything except errors", action="store_true")
+    parser.add_argument("-q", "--quiet", help="do not output details", action="store_true")
     parser.add_argument("-v", "--verbose", help="print debug informations", action="store_true")
     subparser = parser.add_subparsers()
 
@@ -60,6 +64,7 @@ def main():
 
     parser_equalize = subparser.add_parser("equalize", help="equalize a Portage tree (make it Git-friendly to ease merges with stable ebuild names and their symlinks); operate on the whole tree if no package/atom is given; otherwise operate on given packages/atoms only")
     parser_equalize.add_argument("packages", help="packages or atoms", nargs="*", default=[])
+    parser_equalize.add_argument("-s", "--summary", help="print a summary of which ebuilds were removed", action="store_true")
     parser_equalize.set_defaults(func=main_equalize)
 
     args = parser.parse_args()

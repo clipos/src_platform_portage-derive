@@ -70,6 +70,18 @@ def get_all_dependencies(depends, db=None, pkgs=None, all_useflags=False, exclud
         for sub in get_all_dependencies(get_atom_dependencies(atom, db, all_useflags), db, pkgs, all_useflags, exclude):
             yield sub
 
+def _get_plural(name, elements):
+    if isinstance(elements, set) or isinstance(elements, list):
+        nb = len(elements)
+        if nb > 0:
+            epilog = ": {}".format(" ".join(elements))
+        else:
+            epilog = ""
+    else:
+        nb = elements
+        epilog = ""
+    return "{} {}{}{}".format(nb, name, ("", "s")[nb > 1], epilog)
+
 class MultiDb(object):
     """wrapper around a set of Portage databases"""
     def __init__(self, portdir, profiles):
@@ -88,7 +100,7 @@ class MultiDb(object):
         self._db = portage.db[portage.root]["porttree"].dbapi
         # ignore overlays
         self._db.porttrees = [ self.portdir ]
-        self._init_log()
+        logging.info("using {}".format(_get_plural("profile", [x for x in self.get_profile_paths()])))
 
     # make unique and deterministic (sorted) a set of Portage configurations
     def _init_configs(self, profiles):
@@ -104,11 +116,6 @@ class MultiDb(object):
     def get_profile_paths(self):
         for c in self.configs:
             yield c.profile_path
-
-    def _init_log(self):
-        paths = [x for x in self.get_profile_paths()]
-        nb = len(paths)
-        logging.info("using {} profile{}: {}".format(nb, ("", "s")[nb > 1], paths))
 
     def _get_dbs(self):
         for config in self.configs:
@@ -217,7 +224,18 @@ def fs_remove_tree(src):
     if not DRY_RUN:
         shutil.rmtree(src)
 
-def do_symlinks(mdb, slots, atom, atom_dir):
+class EqualizeSummary(object):
+    def __init__(self):
+        self.removed_ebuilds = set()
+        self.removed_packages = set()
+        self.symlinked_ebuilds = 0
+
+    def get_lines(self):
+        yield _get_plural("removed ebuild", self.removed_ebuilds)
+        yield _get_plural("removed package", self.removed_packages)
+        yield _get_plural("symlinked ebuild", self.symlinked_ebuilds)
+
+def do_symlinks(mdb, slots, atom, atom_dir, summary):
     logging.debug("working in {}".format(atom_dir))
     # for each slot, get the best match according to the profile (i.e. newer stable, or newer unstable if the profile whitelist this atom)
     visibles = set()
@@ -234,6 +252,7 @@ def do_symlinks(mdb, slots, atom, atom_dir):
             if tail == ".ebuild" and head not in visibles:
                 try:
                     fs_remove(os.path.join(atom_dir, name))
+                    summary.removed_ebuilds.add(head)
                 except OutsideOfPortageTreeException as exc:
                     logging.warning("skipping file for deletion (duplicate atoms?): %s/%s", atom_dir, name)
                     continue
@@ -263,6 +282,7 @@ def do_symlinks(mdb, slots, atom, atom_dir):
             continue
         try:
             fs_symlink(atom_dir, src, dst)
+            summary.symlinked_ebuilds += 1
         except OutsideOfPortageTreeException as exc:
             logging.warning("skipping atom for symlink (duplicate atoms?): %s/(%s -> %s)", atom_dir, src, dst)
             continue
@@ -284,6 +304,7 @@ def equalize(mdb, atoms=None, dry_run=False):
         atoms = mdb.cp_all()
 
     atom_nb = len(atoms)
+    summary = EqualizeSummary()
     for i, atom in enumerate(atoms, start=1):
         # find all the slots for this atom
         slots = set()
@@ -293,15 +314,18 @@ def equalize(mdb, atoms=None, dry_run=False):
         logging.info("equalizing {}/{} {}".format(i, atom_nb, atom))
         # check if some slots are visible to the current profile
         if len(slots) != 0:
-            do_symlinks(mdb, slots, atom, mdb.get_atom_dir_selected(cpv))
+            do_symlinks(mdb, slots, atom, mdb.get_atom_dir_selected(cpv), summary)
             continue
         # remove files which are not usable with the current profile
         cpvs = mdb.match_all(atom)
         if len(cpvs) == 0:
             raise Exception("Missing atom in the cache, you should run `egencache --update` for this Portage tree")
-        atom_dir = mdb.get_atom_dir_selected(cpvs.pop())
+        cpv = cpvs.pop()
+        atom_dir = mdb.get_atom_dir_selected(cpv)
         try:
             fs_remove_tree(atom_dir)
+            summary.removed_packages.add("/".join(portage.pkgsplit(cpv)[0:2]))
         except OutsideOfPortageTreeException as exc:
             logging.debug("skipping atom dir for deletion: %s", atom_dir)
             continue
+    return summary
