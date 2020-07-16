@@ -9,7 +9,7 @@
 
 # The only place where the version of this Python package is defined (setup.py
 # reparses only this line for setuptools). This versioning follows semver.
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import logging
 import os
