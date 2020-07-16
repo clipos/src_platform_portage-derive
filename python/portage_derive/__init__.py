@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright © 2015-2018 ANSSI. All Rights Reserved.
@@ -16,6 +16,8 @@ import os
 import shutil
 
 import portage
+
+import functools
 
 DRY_RUN = False
 
@@ -206,7 +208,7 @@ def _do_symlinks(mdb, slots, atom, atom_dir, summary):
     # It's more common to remove an old package version than the more
     # up-to-date (i.e. we don't downgrade packages but can keep and old version
     # for compatibility): decrease order to keep the most up to date at first.
-    for i, pvr in enumerate(sorted([portage.pkgsplit(x) for x in visibles], portage.pkgcmp, reverse=True)):
+    for i, pvr in enumerate(sorted([portage.pkgsplit(x) for x in visibles], key=functools.cmp_to_key(portage.pkgcmp), reverse=True)):
         if pvr[2] == "r0":
             name = "-".join(pvr[:-1])
         else:

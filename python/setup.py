@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright © 2015-2018 ANSSI. All Rights Reserved.
@@ -12,8 +12,8 @@ import sys
 
 from setuptools import setup
 
-if sys.version_info.major > 2:
-    raise RuntimeError("Support for Python 2 only.")
+if sys.version_info.major < 3:
+    raise RuntimeError("Support for Python 3 only.")
 
 # This current file:
 here = os.path.abspath(os.path.dirname(__file__))
